@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Roster">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1116" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Shift Roster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: single-column phone app. Sticky header, month grid in the middle, fixed tab bar at the bottom, bottom sheets for editing. */
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --ink: #141922;
+  --muted: #5a6371;
+  --line: #d5dae2;
+  --accent: #1d5b8c;
+  --accent-ink: #ffffff;
+  --good: #1c7f4c;
+  --good-tint: #d7f0e2;
+  --warn: #8f5f00;
+  --danger: #b3261e;
+  --note: #b7791f;
+  --scrim: rgba(12, 16, 24, 0.45);
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* "only light" stops Android webviews from force-darkening the light palette, which hid typed text */
+  color-scheme: only light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116;
+    --surface: #171b22;
+    --ink: #e6e9ef;
+    --muted: #97a0ae;
+    --line: #2a303b;
+    --accent: #72aee3;
+    --accent-ink: #0b1622;
+    --good: #52c48d;
+    --good-tint: rgba(82, 196, 141, 0.17);
+    --warn: #e2b341;
+    --danger: #ff8a80;
+    --note: #e2b341;
+    --scrim: rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --surface: #171b22;
+  --ink: #e6e9ef;
+  --muted: #97a0ae;
+  --line: #2a303b;
+  --accent: #72aee3;
+  --accent-ink: #0b1622;
+  --good: #52c48d;
+  --good-tint: rgba(82, 196, 141, 0.17);
+  --warn: #e2b341;
+  --danger: #ff8a80;
+  --note: #e2b341;
+  --scrim: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+/* The app's own theme switch (Setup > Preferences) wins over the phone and the host */
+:root[data-app-theme="light"] {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --ink: #141922;
+  --muted: #5a6371;
+  --line: #d5dae2;
+  --accent: #1d5b8c;
+  --accent-ink: #ffffff;
+  --good: #1c7f4c;
+  --good-tint: #d7f0e2;
+  --warn: #8f5f00;
+  --danger: #b3261e;
+  --note: #b7791f;
+  --scrim: rgba(12, 16, 24, 0.45);
+  color-scheme: only light;
+}
+:root[data-app-theme="dark"] {
+  --bg: #0e1116;
+  --surface: #171b22;
+  --ink: #e6e9ef;
+  --muted: #97a0ae;
+  --line: #2a303b;
+  --accent: #72aee3;
+  --accent-ink: #0b1622;
+  --good: #52c48d;
+  --good-tint: rgba(82, 196, 141, 0.17);
+  --warn: #e2b341;
+  --danger: #ff8a80;
+  --note: #e2b341;
+  --scrim: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); }
+small { font-size: 12.5px; }
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  min-height: 100%;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+}
+header.top {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left));
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  font-family: var(--font-display); font-weight: 700; font-size: 23px;
+  letter-spacing: 0.07em; text-transform: uppercase; margin: 0;
+}
+.sync {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 500;
+  padding: 4px 11px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--muted);
+}
+.sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sync.ok { color: var(--good); }
+.sync.warn { color: var(--warn); }
+.sync.bad { color: var(--danger); }
+
+main { padding: 14px calc(16px + env(safe-area-inset-right)) 24px calc(16px + env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 14px; }
+
+.h {
+  font-family: var(--font-display); font-weight: 700; font-size: 20px;
+  letter-spacing: 0.05em; text-transform: uppercase; margin: 0; text-wrap: balance;
+}
+.h.sm { font-size: 16px; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px; display: flex; flex-direction: column; gap: 12px;
+}
+.card.tight { gap: 8px; padding: 12px 14px; }
+.card p { margin: 0; }
+.sechead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sechead.wrap { flex-wrap: wrap; row-gap: 8px; }
+.hint { margin: 0; font-size: 13px; color: var(--muted); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 9px;
+  padding: 9px 15px; font-weight: 500; text-decoration: none; white-space: nowrap;
+}
+.btn.sm { padding: 6px 12px; font-size: 14px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--danger); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--accent); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.iconbtn {
+  width: 40px; height: 40px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 10px;
+}
+.iconbtn svg { width: 18px; height: 18px; }
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  padding: 7px 15px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); font-weight: 500;
+}
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* Month navigation */
+.monthbar { display: flex; align-items: center; gap: 8px; }
+.month {
+  flex: 1; min-width: 0; margin: 0; text-align: center; white-space: nowrap;
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(19px, 6vw, 25px); letter-spacing: 0.02em;
+}
+.month span { color: var(--muted); font-weight: 600; }
+
+/* Calendar grid */
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.dow {
+  text-align: center; font-size: 11.5px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em; padding-bottom: 2px;
+}
+.cell, .ccell {
+  position: relative; min-width: 0;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 4px 3px 5px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--line); text-align: left;
+}
+.cell { min-height: 64px; }
+.ccell { min-height: 70px; }
+.cell.out, .ccell.out { opacity: 0.42; }
+.cell.today, .ccell.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.dtop { display: flex; align-items: center; justify-content: space-between; gap: 2px; min-height: 15px; }
+.marks { display: inline-flex; align-items: center; gap: 3px; padding-right: 2px; }
+.ovdot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; flex: none; }
+.notemark { width: 11px; height: 11px; color: var(--note); display: inline-block; flex: none; }
+.marklegend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.marklegend span.item { display: inline-flex; align-items: center; gap: 6px; }
+.notes { display: flex; flex-direction: column; }
+.noterow {
+  display: grid; grid-template-columns: 92px 1fr; gap: 10px; width: 100%; text-align: left;
+  padding: 9px 2px; border: 0; border-top: 1px solid var(--line); background: none;
+}
+.noterow:first-child { border-top: 0; }
+.noterow .nd { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.noterow .nt { white-space: pre-wrap; overflow-wrap: anywhere; }
+.notebox { white-space: pre-wrap; overflow-wrap: anywhere; }
+textarea.input { resize: vertical; min-height: 84px; line-height: 1.4; }
+.row.static { cursor: default; }
+.ccell.both { background: var(--good-tint); border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
+.dnum { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); padding-left: 2px; line-height: 1.2; }
+.today .dnum { color: var(--accent); }
+.both .dnum { color: var(--good); }
+.blk {
+  display: block; text-align: center; white-space: nowrap;
+  font-family: var(--font-display); font-weight: 600; font-size: 14px; line-height: 1;
+  letter-spacing: 0.02em; padding: 4px 1px; border-radius: 5px; overflow: hidden;
+}
+.blk.long { font-size: 12px; letter-spacing: 0; }
+.blk.sm { font-size: 12.5px; padding: 3px 1px; }
+.blk.sm.long { font-size: 10.5px; }
+.blk.lg { font-size: 22px; padding: 8px 16px; border-radius: 8px; display: inline-block; min-width: 72px; }
+.blk.off { color: var(--muted); border: 1px dashed var(--line); padding-top: 3px; padding-bottom: 3px; }
+.blk.sm.off { padding-top: 2px; padding-bottom: 2px; }
+.blk.none { border: 1px dotted var(--line); color: transparent; }
+.tm { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); text-align: center; min-height: 13px; line-height: 1.2; }
+
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; }
+.legend li { display: inline-flex; align-items: center; gap: 7px; }
+.legend b { font-variant-numeric: tabular-nums; }
+.sw { width: 14px; height: 14px; border-radius: 4px; flex: none; display: inline-block; }
+.sw.offsw { border: 1px dashed var(--muted); }
+.sw.roster { border: 2px solid var(--accent); }
+.sw.both { background: var(--good-tint); border: 2px solid var(--good); }
+
+/* Setup steps */
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; counter-reset: step; }
+.steps li { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; }
+.steps li::before {
+  counter-increment: step; content: counter(step);
+  width: 26px; height: 26px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 13px; border: 1.5px solid var(--line); color: var(--muted);
+}
+.steps li.done::before { content: "\2713"; background: var(--good); border-color: var(--good); color: #fff; }
+.steps strong { display: block; }
+.steps span { font-size: 13px; color: var(--muted); }
+
+/* Lists in Setup */
+.rows { display: flex; flex-direction: column; }
+.row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 11px 2px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left;
+}
+.row:first-child { border-top: 0; }
+.row .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.row .grow small { color: var(--muted); }
+.row .chev { color: var(--muted); flex: none; display: inline-flex; }
+.row .chev svg { width: 18px; height: 18px; }
+.row .blk { min-width: 52px; }
+.tag {
+  font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+  background: var(--good-tint); color: var(--good); white-space: nowrap;
+}
+.seg {
+  display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left;
+  padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+}
+.seg .meta { display: flex; flex-direction: column; }
+.seg .meta small { color: var(--muted); }
+.minislots { display: flex; flex-wrap: wrap; gap: 4px; }
+.minislots .blk { min-width: 34px; }
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.segmented button { border: 0; background: var(--surface); padding: 8px 16px; font-weight: 500; }
+.segmented button + button { border-left: 1px solid var(--line); }
+.segmented button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+/* Compare */
+.pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: end; }
+.pair .vs { padding-bottom: 10px; color: var(--muted); font-weight: 600; font-size: 13px; }
+.stat { display: flex; align-items: baseline; gap: 10px; }
+.stat b { font-family: var(--font-display); font-size: 34px; line-height: 1; color: var(--good); font-variant-numeric: tabular-nums; }
+.runs { display: flex; flex-direction: column; }
+.run {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;
+  padding: 10px 2px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left;
+}
+.run:first-child { border-top: 0; }
+.run .len { font-size: 12.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--good-tint); color: var(--good); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Forms */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .lbl { font-size: 13px; font-weight: 600; }
+.input, select.input, textarea.input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px;
+  background-color: var(--bg); min-height: 44px;
+  /* Set text colour explicitly: some mobile webviews ignore inherited colour in form fields, mainly textareas in dark mode */
+  color: var(--ink); -webkit-text-fill-color: var(--ink); caret-color: var(--accent);
+}
+textarea.input, select.input, input.input:not([type]), input.input[type="number"] { -webkit-appearance: none; appearance: none; }
+.input::placeholder { color: var(--muted); -webkit-text-fill-color: var(--muted); opacity: 1; }
+.input:-webkit-autofill { -webkit-text-fill-color: var(--ink); box-shadow: inset 0 0 0 100px var(--bg); }
+select.input {
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px; background-repeat: no-repeat;
+}
+select.input option { background: var(--surface); color: var(--ink); }
+.err { color: var(--danger); font-weight: 500; }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+.check span { display: flex; flex-direction: column; }
+.check small { color: var(--muted); }
+.twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+.rule { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.daychips { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.daychip { padding: 7px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; font-weight: 500; }
+.daychip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rulerow { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.rulerow label { font-size: 13px; font-weight: 600; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch {
+  width: 36px; height: 36px; border-radius: 9px; border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); padding: 0; position: relative;
+}
+.swatch[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--surface); }
+.swatch.custom {
+  display: inline-flex; align-items: center; justify-content: center; overflow: hidden;
+  background: conic-gradient(#e5484d, #f5a524, #46a758, #0090ff, #8e4ec6, #e5484d);
+}
+.swatch.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+
+/* Sheet */
+.sheet-wrap { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet-wrap[hidden] { display: none; }
+.backdrop { position: absolute; inset: 0; background: var(--scrim); }
+.sheet {
+  position: relative; width: 100%; max-width: 640px; max-height: 90%; overflow-y: auto;
+  background: var(--surface); border-radius: 18px 18px 0 0;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 16px;
+  animation: rise 0.18s ease-out;
+}
+@keyframes rise { from { transform: translateY(24px); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+.sheethead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sheethead p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+.opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.opt {
+  display: flex; align-items: center; gap: 10px; min-height: 48px;
+  padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-align: left;
+}
+.opt[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.optx { display: flex; flex-direction: column; min-width: 0; }
+.optx small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.actions .spacer { flex: 1; }
+.slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.slot {
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 50px;
+  padding: 4px 4px 5px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
+}
+.slot .idx { font-size: 10.5px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.slot[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.palette { display: flex; flex-wrap: wrap; gap: 8px; }
+.palette button {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--surface); font-weight: 500;
+}
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.strip-wrap { overflow-x: auto; }
+.strip { display: grid; grid-template-columns: repeat(14, minmax(42px, 1fr)); gap: 4px; min-width: 620px; }
+.sday { display: flex; flex-direction: column; align-items: stretch; gap: 2px; font-size: 11px; text-align: center; }
+.sday .d { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.note { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
+.loading { padding: 40px 8px; text-align: center; color: var(--muted); }
+
+/* Tabs */
+.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tabs nav { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tab {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 0 10px; color: var(--muted); text-decoration: none; font-size: 12px; font-weight: 500;
+}
+.tab svg { width: 22px; height: 22px; }
+.tab[aria-current="page"] { color: var(--accent); }
+
+@media (min-width: 520px) {
+  .cell { min-height: 72px; }
+  .blk { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1 class="brand">Roster</h1>
+    <button type="button" id="sync" class="sync" data-action="retry">Loading</button>
+  </header>
+  <main id="main" aria-live="polite"></main>
+</div>
+<div class="tabs">
+  <nav aria-label="Views">
+    <a class="tab" href="#calendar" data-view="calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+      Calendar
+    </a>
+    <a class="tab" href="#compare" data-view="compare">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/></svg>
+      Compare
+    </a>
+    <a class="tab" href="#setup" data-view="setup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      Setup
+    </a>
+  </nav>
+</div>
+<div id="sheet" class="sheet-wrap" hidden>
+  <div class="backdrop" data-action="sheet-close"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1" id="sheet-panel"></div>
+</div>
+
+<script>
+'use strict';
+
+/* ---------- Constants and helpers ---------- */
+const PRESETS = [
+  ['#2563c9', 'Blue'], ['#d9911a', 'Amber'], ['#6b42b8', 'Purple'], ['#1f8a52', 'Green'],
+  ['#c2410c', 'Rust'], ['#0f8b8d', 'Teal'], ['#b8235a', 'Raspberry'], ['#5b6472', 'Slate'],
+  ['#8a5a2b', 'Brown'], ['#e3c21b', 'Yellow'], ['#38a3e6', 'Sky'], ['#1b1f27', 'Charcoal']
+];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_MS = 86400000;
+const LS_DATA = 'shift-roster-data-v1';
+const LS_UI = 'shift-roster-ui-v1';
+const VIEWS = ['calendar', 'compare', 'setup'];
+const MAX_SLOTS = 120;
+const APP_VERSION = '6 (standalone)';
+const THEMES = [['auto', 'Match phone'], ['light', 'Light'], ['dark', 'Dark']];
+const MAX_RANGE = 366;
+const ICON_PREV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+const ICON_NEXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+const NOTE_MARK = '<svg class="notemark" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M2 1h5.6L10 3.4V11H2z"/></svg>';
+const OV_MARK = '<span class="ovdot" aria-hidden="true"></span>';
+const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const newId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3);
+const pad = n => String(n).padStart(2, '0');
+const toKey = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+const isKey = k => typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k);
+const keyToNum = k => { const [y, m, d] = k.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / DAY_MS); };
+const numToKey = n => { const t = new Date(n * DAY_MS); return toKey(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()); };
+const todayKey = () => { const t = new Date(); return toKey(t.getFullYear(), t.getMonth(), t.getDate()); };
+const keyDate = k => new Date(keyToNum(k) * DAY_MS);
+const fmtShort = k => { const t = keyDate(k); return `${DOW[t.getUTCDay()]} ${t.getUTCDate()} ${MON[t.getUTCMonth()]}`; };
+const fmtLong = k => `${fmtShort(k)} ${keyDate(k).getUTCFullYear()}`;
+const fmtTime = t => (t && /^\d{2}:\d{2}$/.test(t)) ? t.replace(':', '') : '';
+const safeColor = c => (typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) ? c.toLowerCase() : '#5b6472';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function textOn(hex) {
+  const c = safeColor(hex);
+  const lin = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255)
+    .map(x => x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+  return L > 0.18 ? '#111418' : '#ffffff';
+}
+function autoLabel(name) {
+  const n = String(name || '').trim();
+  if (!n) return '';
+  if (n.length <= 5) return n;
+  const words = n.split(/\s+/).filter(Boolean);
+  if (words.length > 1) return words.slice(0, 4).map(w => w[0].toUpperCase()).join('');
+  return n.slice(0, 4);
+}
+function labelOf(t) {
+  const l = String(t.label || '').trim();
+  return l ? l.slice(0, 5) : autoLabel(t.name);
+}
+
+/* ---------- State ---------- */
+function blankState() {
+  return { v: 1, people: [], types: [], patterns: {}, overrides: {}, notes: {}, settings: { weekStart: 1 } };
+}
+function normalise(raw) {
+  const s = blankState();
+  if (!raw || typeof raw !== 'object') return s;
+  const d = JSON.parse(JSON.stringify(raw));
+  if (Array.isArray(d.people)) s.people = d.people.filter(p => p && typeof p.id === 'string').map(p => ({ id: p.id, name: String(p.name || 'Unnamed').slice(0, 40) }));
+  if (Array.isArray(d.types)) s.types = d.types.filter(t => t && typeof t.id === 'string').map(t => ({
+    id: t.id, name: String(t.name || 'Shift').slice(0, 30), label: String(t.label || '').slice(0, 5),
+    color: safeColor(t.color), start: /^\d{2}:\d{2}$/.test(t.start || '') ? t.start : '', off: !!t.off,
+    len: (typeof t.len === 'number' && t.len > 0 && t.len <= 24) ? t.len : null,
+    rules: Array.isArray(t.rules) ? t.rules
+      .filter(r => r && Array.isArray(r.days) && /^\d{2}:\d{2}$/.test(r.start || ''))
+      .map(r => ({ days: [...new Set(r.days.filter(x => Number.isInteger(x) && x >= 0 && x <= 6))].sort(), start: r.start }))
+      .filter(r => r.days.length).slice(0, 7) : []
+  }));
+  if (d.patterns && typeof d.patterns === 'object') {
+    for (const pid of Object.keys(d.patterns)) {
+      const list = Array.isArray(d.patterns[pid]) ? d.patterns[pid] : [];
+      s.patterns[pid] = list.filter(x => x && isKey(x.start) && Array.isArray(x.slots))
+        .map(x => ({ id: typeof x.id === 'string' ? x.id : newId(), start: x.start, slots: x.slots.filter(v => typeof v === 'string').slice(0, MAX_SLOTS) }))
+        .sort((a, b) => a.start < b.start ? -1 : 1);
+    }
+  }
+  if (d.overrides && typeof d.overrides === 'object') {
+    for (const pid of Object.keys(d.overrides)) {
+      const m = d.overrides[pid];
+      if (!m || typeof m !== 'object') continue;
+      const out = {};
+      for (const k of Object.keys(m)) if (isKey(k) && typeof m[k] === 'string') out[k] = m[k];
+      s.overrides[pid] = out;
+    }
+  }
+  if (d.notes && typeof d.notes === 'object') {
+    for (const k of Object.keys(d.notes)) {
+      if (isKey(k) && typeof d.notes[k] === 'string' && d.notes[k].trim()) s.notes[k] = d.notes[k].slice(0, 500);
+    }
+  }
+  if (d.settings && (d.settings.weekStart === 0 || d.settings.weekStart === 1)) s.settings.weekStart = d.settings.weekStart;
+  return s;
+}
+
+let state = blankState();
+const now = new Date();
+const ui = { person: null, a: null, b: null, patPerson: null, theme: 'auto', y: now.getFullYear(), m: now.getMonth() };
+let sheet = null;
+
+const typeById = id => state.types.find(t => t.id === id);
+const personById = id => state.people.find(p => p.id === id);
+const hasPattern = pid => (state.patterns[pid] || []).some(s => s.slots.length);
+
+/* ---------- Roster engine ---------- */
+// The pattern in force on a date is the one with the latest start date on or before it.
+function patternSlot(pid, key) {
+  let best = null;
+  for (const seg of (state.patterns[pid] || [])) {
+    if (seg.slots.length && seg.start <= key && (!best || seg.start > best.start)) best = seg;
+  }
+  if (!best) return null;
+  const len = best.slots.length;
+  const diff = keyToNum(key) - keyToNum(best.start);
+  const v = best.slots[((diff % len) + len) % len];
+  return (v === 'off' || typeById(v)) ? v : null;
+}
+// An override replaces the day; the pattern keeps counting underneath.
+function resolve(pid, key) {
+  const map = state.overrides[pid];
+  const ov = map ? map[key] : undefined;
+  const base = patternSlot(pid, key);
+  const ovValid = ov !== undefined && (ov === 'off' || typeById(ov));
+  return { val: ovValid ? ov : base, base, overridden: !!ovValid };
+}
+function isOff(val) {
+  if (val == null) return false;
+  if (val === 'off') return true;
+  const t = typeById(val);
+  return !!(t && t.off);
+}
+// Weekday rules on a shift type override its default start time. The length stays fixed, so the finish moves with the start.
+function startFor(t, key) {
+  if (key && t.rules && t.rules.length) {
+    const wd = keyDate(key).getUTCDay();
+    const r = t.rules.find(x => x.days.includes(wd));
+    if (r) return r.start;
+  }
+  return t.start;
+}
+const toMin = t => (+t.slice(0, 2)) * 60 + (+t.slice(3, 5));
+const fromMin = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + pad(m % 60); };
+const fmtLen = h => `${+h.toFixed(2)} hr${h === 1 ? '' : 's'}`;
+function timeRange(start, len) {
+  if (!start) return len ? fmtLen(len) : '';
+  return len ? `${fmtTime(start)}-${fromMin(toMin(start) + len * 60)}` : fmtTime(start);
+}
+function weekOrder() {
+  const ws = state.settings.weekStart === 0 ? 0 : 1;
+  return Array.from({ length: 7 }, (_, i) => (ws + i) % 7);
+}
+const daysText = days => weekOrder().filter(d => days.includes(d)).map(d => DOW[d]).join(', ');
+function typeSummary(t) {
+  const parts = [t.start ? timeRange(t.start, t.len) + (t.len ? `, ${fmtLen(t.len)}` : '') : (t.len ? fmtLen(t.len) : 'No start time')];
+  for (const r of t.rules) parts.push(`${daysText(r.days)} ${timeRange(r.start, t.len)}`);
+  return parts.join(' · ');
+}
+function describe(val, key) {
+  if (val == null) return 'No roster';
+  if (val === 'off') return 'Off';
+  const t = typeById(val);
+  if (!t) return 'No roster';
+  const tr = timeRange(startFor(t, key), t.len);
+  return tr ? `${t.name} ${tr}` : t.name;
+}
+function blockHTML(val, size) {
+  const cls = size ? ' ' + size : '';
+  if (val == null) return `<span class="blk none${cls}" aria-hidden="true">&nbsp;</span>`;
+  if (val === 'off') return `<span class="blk off${cls}">Off</span>`;
+  const t = typeById(val);
+  if (!t) return `<span class="blk none${cls}" aria-hidden="true">&nbsp;</span>`;
+  const c = safeColor(t.color);
+  const lab = labelOf(t);
+  return `<span class="blk${cls}${lab.length >= 4 ? ' long' : ''}" style="background:${c};color:${textOn(c)}">${esc(lab)}</span>`;
+}
+function monthCells(y, m) {
+  const firstNum = keyToNum(toKey(y, m, 1));
+  const dow = new Date(firstNum * DAY_MS).getUTCDay();
+  const ws = state.settings.weekStart === 0 ? 0 : 1;
+  const lead = (dow - ws + 7) % 7;
+  const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const total = Math.ceil((lead + days) / 7) * 7;
+  const out = [];
+  for (let i = 0; i < total; i++) {
+    const k = numToKey(firstNum - lead + i);
+    out.push({ key: k, d: +k.slice(8), inMonth: i >= lead && i < lead + days });
+  }
+  return out;
+}
+function dowHeader() {
+  const ws = state.settings.weekStart === 0 ? 0 : 1;
+  return Array.from({ length: 7 }, (_, i) => DOW[(ws + i) % 7]);
+}
+function sharedRuns(a, b, fromKey, days) {
+  const runs = [];
+  let cur = null;
+  const start = keyToNum(fromKey);
+  for (let n = start; n < start + days; n++) {
+    const k = numToKey(n);
+    if (isOff(resolve(a, k).val) && isOff(resolve(b, k).val)) {
+      if (cur && cur.end === n - 1) cur.end = n;
+      else { cur = { start: n, end: n }; runs.push(cur); }
+    }
+  }
+  return runs;
+}
+
+/* ---------- Persistence ---------- */
+let mode = 'loading';     // loading | cloud | local | error
+let sync = 'loading';     // loading | waiting | synced | saving | local | stale | error | full
+let docRef = null;
+let loadTimer = null, writeTimer = null;
+let writing = false, dirty = false, resubscribed = false;
+
+function loadUI() {
+  try {
+    const u = JSON.parse(localStorage.getItem(LS_UI) || '{}');
+    for (const k of ['person', 'a', 'b', 'patPerson']) if (typeof u[k] === 'string') ui[k] = u[k];
+    if (THEMES.some(([v]) => v === u.theme)) ui.theme = u.theme;
+    if (isKey(u.lastBackup)) ui.lastBackup = u.lastBackup;
+  } catch (_) { /* storage unavailable */ }
+}
+function saveUI() {
+  try { localStorage.setItem(LS_UI, JSON.stringify({ person: ui.person, a: ui.a, b: ui.b, patPerson: ui.patPerson, theme: ui.theme, lastBackup: ui.lastBackup || null })); } catch (_) { /* ignore */ }
+}
+function applyTheme() {
+  const root = document.documentElement;
+  if (ui.theme === 'light' || ui.theme === 'dark') root.setAttribute('data-app-theme', ui.theme);
+  else root.removeAttribute('data-app-theme');
+}
+function startLocal() {
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (_) { /* ignore */ }
+  try { state = normalise(JSON.parse(localStorage.getItem(LS_DATA) || 'null')); } catch (_) { state = blankState(); }
+  mode = 'local'; sync = 'local';
+  render();
+}
+function saveLocal() {
+  try { localStorage.setItem(LS_DATA, JSON.stringify(state)); } catch (_) { sync = 'error'; renderSync(); }
+}
+function commit() {
+  render();
+  if (mode === 'local') { saveLocal(); return; }
+  if (!docRef) return;
+  dirty = true; sync = 'saving'; renderSync();
+  clearTimeout(writeTimer);
+  writeTimer = setTimeout(flush, 400);
+}
+async function flush() {
+  if (writing || !dirty || !docRef) return;
+  writing = true; dirty = false;
+  const body = JSON.parse(JSON.stringify(state));
+  let ok = false, lastErr = null;
+  for (let attempt = 0; attempt < 2 && !ok; attempt++) {
+    try { await docRef.set(body); ok = true; }
+    catch (e) {
+      lastErr = e;
+      if (e && e.code === 'unavailable' && attempt === 0) { await sleep(700 + Math.random() * 1200); continue; }
+      break;
+    }
+  }
+  writing = false;
+  if (!ok) {
+    dirty = true;
+    sync = (lastErr && lastErr.code === 'quota_exceeded') ? 'full' : 'error';
+    renderSync();
+    return;
+  }
+  if (dirty) flush();
+  else { sync = 'synced'; renderSync(); }
+}
+function subscribe() {
+  docRef.onSnapshot(snap => {
+    if (!snap.metadata.fromCache) clearTimeout(loadTimer);
+    const busy = dirty || writing || snap.metadata.hasPendingWrites;
+    if (!busy) {
+      if (snap.exists) state = normalise(snap.data());
+      else if (mode === 'loading') state = blankState();
+    }
+    mode = 'cloud';
+    if (!busy) sync = snap.metadata.fromCache ? (sync === 'stale' ? 'stale' : 'loading') : 'synced';
+    render();
+  }, err => {
+    clearTimeout(loadTimer);
+    if (mode === 'loading') { mode = 'error'; sync = 'error'; render(); return; }
+    sync = 'stale'; renderSync();
+    if (err && err.code === 'unavailable' && !resubscribed) { resubscribed = true; setTimeout(subscribe, 5000); }
+  });
+}
+async function waitForClaude() {
+  for (let i = 0; i < 20; i++) {
+    if (window.claude && typeof window.claude.use === 'function') return window.claude;
+    await sleep(100);
+  }
+  return null;
+}
+async function init() {
+  loadUI();
+  applyTheme();
+  render();
+  const host = null; // Standalone edition: no Claude host, data stays on this device
+  let db = null, user = null, id = null;
+  if (host) {
+    try {
+      [db, user] = await Promise.all([
+        host.use('db').catch(() => null),
+        host.use('user').catch(() => null)
+      ]);
+      id = user ? await user.id() : null;
+    } catch (_) { db = null; }
+  }
+  if (!db || !id) { startLocal(); return; }
+  try { docRef = db.doc('data/users/' + id + '/roster'); }
+  catch (_) { startLocal(); return; }
+  loadTimer = setTimeout(() => { if (mode === 'loading') { sync = 'waiting'; render(); } else { sync = 'stale'; renderSync(); } }, 10000);
+  subscribe();
+}
+
+/* ---------- Rendering ---------- */
+function currentView() {
+  const h = location.hash.slice(1);
+  return VIEWS.includes(h) ? h : 'calendar';
+}
+function activePerson() {
+  if (ui.person && personById(ui.person)) return ui.person;
+  return state.people.length ? state.people[0].id : null;
+}
+function renderSync() {
+  const el = $('#sync');
+  const map = {
+    loading: ['Loading', ''], waiting: ['Waiting for connection', 'warn'], synced: ['Synced', 'ok'],
+    saving: ['Saving', 'warn'], local: ['Saved on this device', 'ok'], stale: ['Offline, will sync', 'warn'],
+    error: ['Not saved, tap to retry', 'bad'], full: ['Storage full', 'bad']
+  };
+  const [text, cls] = map[sync] || map.loading;
+  el.textContent = text;
+  el.className = 'sync' + (cls ? ' ' + cls : '');
+}
+function render() {
+  renderSync();
+  const view = currentView();
+  document.querySelectorAll('.tab').forEach(a => {
+    if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+  const main = $('#main');
+  if (mode === 'loading') {
+    main.innerHTML = sync === 'waiting'
+      ? `<div class="card"><p>Your saved rosters haven't loaded yet. Keep this page open and they'll appear once the connection comes back. Editing stays locked until then so nothing gets overwritten.</p></div>`
+      : `<p class="loading">Loading your rosters</p>`;
+    return;
+  }
+  if (mode === 'error') {
+    main.innerHTML = `<div class="card"><p>Your saved rosters couldn't be loaded. Reload the page to try again.</p></div>`;
+    return;
+  }
+  main.innerHTML = view === 'compare' ? viewCompare() : view === 'setup' ? viewSetup() : viewCalendar();
+}
+function monthBar() {
+  return `<div class="monthbar">
+    <button type="button" class="iconbtn" data-action="prev" aria-label="Previous month">${ICON_PREV}</button>
+    <h2 class="month">${MONTH_FULL[ui.m]} <span>${ui.y}</span></h2>
+    <button type="button" class="iconbtn" data-action="next" aria-label="Next month">${ICON_NEXT}</button>
+    <button type="button" class="btn sm" data-action="today">Today</button>
+  </div>`;
+}
+function setupProgress() {
+  const people = state.people.length > 0;
+  const types = state.types.length > 0;
+  const patterns = state.people.some(p => hasPattern(p.id));
+  return { people, types, patterns, done: people && types && patterns };
+}
+function setupCard(sp) {
+  return `<section class="card">
+    <h2 class="h">Set up your roster</h2>
+    <ol class="steps">
+      <li class="${sp.people ? 'done' : ''}"><div><strong>Add people</strong><span>Everyone whose roster you track.</span></div>
+        <button type="button" class="btn sm" data-action="add-person">Add person</button></li>
+      <li class="${sp.types ? 'done' : ''}"><div><strong>Create shift types</strong><span>Day, Night, Court, Annual Leave and so on.</span></div>
+        <button type="button" class="btn sm" data-action="add-type">Add type</button></li>
+      <li class="${sp.patterns ? 'done' : ''}"><div><strong>Build a pattern</strong><span>The repeating cycle and the date it starts.</span></div>
+        <button type="button" class="btn sm" data-action="add-pattern" data-pid="${esc(activePerson() || '')}" ${sp.people && sp.types ? '' : 'disabled'}>Add pattern</button></li>
+    </ol>
+  </section>`;
+}
+function viewCalendar() {
+  const parts = [];
+  const sp = setupProgress();
+  if (!sp.done) parts.push(setupCard(sp));
+  if (!state.people.length) return parts.join('');
+  const pid = activePerson();
+  const person = personById(pid);
+  parts.push(`<div class="chips" role="group" aria-label="Whose roster">${state.people.map(p =>
+    `<button type="button" class="chip" data-action="pick-person" data-id="${esc(p.id)}" aria-pressed="${p.id === pid}">${esc(p.name)}</button>`).join('')}</div>`);
+  parts.push(monthBar());
+  const tk = todayKey();
+  const counts = new Map();
+  const cells = monthCells(ui.y, ui.m).map(c => {
+    const r = resolve(pid, c.key);
+    if (c.inMonth && r.val != null) counts.set(r.val, (counts.get(r.val) || 0) + 1);
+    const t = r.val && r.val !== 'off' ? typeById(r.val) : null;
+    const cls = ['cell'];
+    if (!c.inMonth) cls.push('out');
+    if (c.key === tk) cls.push('today');
+    if (r.overridden) cls.push('ov');
+    const note = state.notes[c.key];
+    const label = `${fmtLong(c.key)}: ${describe(r.val, c.key)}${r.overridden ? ', changed from pattern' : ''}${note ? ', has a note' : ''}`;
+    const st = t ? startFor(t, c.key) : '';
+    return `<button type="button" class="${cls.join(' ')}" data-action="day" data-key="${c.key}" aria-label="${esc(label)}"><span class="dtop"><span class="dnum">${c.d}</span><span class="marks">${note ? NOTE_MARK : ''}${r.overridden ? OV_MARK : ''}</span></span>${blockHTML(r.val)}<span class="tm">${st ? fmtTime(st) : ''}</span></button>`;
+  }).join('');
+  parts.push(`<div class="grid">${dowHeader().map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div>`);
+  if (!hasPattern(pid)) {
+    parts.push(`<div class="card note"><span>No pattern set for ${esc(person.name)} yet.</span>
+      <button type="button" class="btn sm primary" data-action="add-pattern" data-pid="${esc(pid)}" ${state.types.length ? '' : 'disabled'}>Build pattern</button></div>`);
+  }
+  const prefix = `${ui.y}-${pad(ui.m + 1)}-`;
+  const monthNotes = Object.keys(state.notes).filter(k => k.startsWith(prefix)).sort();
+  if (monthNotes.length) {
+    parts.push(`<section class="card tight"><h3 class="h sm">${MONTH_FULL[ui.m]} notes</h3><div class="notes">${monthNotes.map(k =>
+      `<button type="button" class="noterow" data-action="day" data-key="${k}"><span class="nd">${fmtShort(k)}</span><span class="nt">${esc(state.notes[k])}</span></button>`).join('')}</div></section>`);
+  }
+  const legend = [];
+  for (const t of state.types) {
+    const n = counts.get(t.id);
+    if (n) legend.push(`<li><span class="sw" style="background:${safeColor(t.color)}"></span>${esc(t.name)} <b>${n}</b></li>`);
+  }
+  if (counts.get('off')) legend.push(`<li><span class="sw offsw"></span>Off <b>${counts.get('off')}</b></li>`);
+  if (legend.length) parts.push(`<section class="card tight"><h3 class="h sm">${MONTH_FULL[ui.m]} totals</h3><ul class="legend">${legend.join('')}</ul></section>`);
+  parts.push(`<p class="hint marklegend"><span>Tap a day to change its shift or add a note.</span><span class="item">${OV_MARK}Changed from pattern</span><span class="item">${NOTE_MARK}Has a note</span></p>`);
+  return parts.join('');
+}
+function comparePair() {
+  const a = personById(ui.a) ? ui.a : state.people[0].id;
+  const b = (personById(ui.b) && ui.b !== a) ? ui.b : state.people.find(p => p.id !== a).id;
+  return [a, b];
+}
+function viewCompare() {
+  if (state.people.length < 2) {
+    return `<section class="card"><h2 class="h">Compare rosters</h2>
+      <p>Add a second person in Setup, give them a pattern, and their shared days off with you show up here.</p>
+      <div><a class="btn primary" href="#setup">Go to Setup</a></div></section>`;
+  }
+  const [a, b] = comparePair();
+  const pa = personById(a), pb = personById(b);
+  const opt = sel => state.people.map(p => `<option value="${esc(p.id)}" ${p.id === sel ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  const tk = todayKey();
+  let monthShared = 0;
+  const cells = monthCells(ui.y, ui.m).map(c => {
+    const ra = resolve(a, c.key), rb = resolve(b, c.key);
+    const both = isOff(ra.val) && isOff(rb.val);
+    if (both && c.inMonth) monthShared++;
+    const cls = ['ccell'];
+    if (!c.inMonth) cls.push('out');
+    if (c.key === tk) cls.push('today');
+    if (both) cls.push('both');
+    const note = state.notes[c.key];
+    const label = `${fmtLong(c.key)}. ${pa.name}: ${describe(ra.val, c.key)}. ${pb.name}: ${describe(rb.val, c.key)}.${both ? ' Both off.' : ''}${note ? ' Has a note.' : ''}`;
+    return `<button type="button" class="${cls.join(' ')}" data-action="cday" data-key="${c.key}" aria-label="${esc(label)}"><span class="dtop"><span class="dnum">${c.d}</span><span class="marks">${note ? NOTE_MARK : ''}</span></span>${blockHTML(ra.val, 'sm')}${blockHTML(rb.val, 'sm')}</button>`;
+  }).join('');
+  const runs = sharedRuns(a, b, tk, 182);
+  const runRows = runs.slice(0, 24).map(r => {
+    const s = numToKey(r.start), e = numToKey(r.end), len = r.end - r.start + 1;
+    const range = len === 1 ? fmtShort(s) : `${fmtShort(s)} to ${fmtShort(e)}`;
+    return `<button type="button" class="run" data-action="jump" data-key="${s}"><span>${range}</span><span class="len">${len} day${len === 1 ? '' : 's'}</span></button>`;
+  }).join('');
+  return `
+    <div class="pair">
+      <div class="field"><label for="cmp-a">Top row</label><select class="input" id="cmp-a">${opt(a)}</select></div>
+      <span class="vs">and</span>
+      <div class="field"><label for="cmp-b">Bottom row</label><select class="input" id="cmp-b">${opt(b)}</select></div>
+    </div>
+    ${monthBar()}
+    <div class="grid">${dowHeader().map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div>
+    <ul class="legend"><li><span class="sw both"></span>Both off</li><li>${NOTE_MARK}Has a note</li><li class="muted">Leave types ticked as a day off count as off. Tap a day for details.</li></ul>
+    <section class="card tight">
+      <div class="stat"><b>${monthShared}</b><span>shared day${monthShared === 1 ? '' : 's'} off in ${MONTH_FULL[ui.m]}</span></div>
+    </section>
+    <section class="card">
+      <h3 class="h sm">Upcoming shared days off</h3>
+      ${runRows ? `<div class="runs">${runRows}</div><p class="hint">Next 26 weeks. Tap a row to jump to that month.</p>`
+        : `<p class="muted">None in the next 26 weeks${hasPattern(a) && hasPattern(b) ? '' : '. Both people need a pattern first'}.</p>`}
+    </section>`;
+}
+function viewSetup() {
+  const people = state.people.map(p => `<button type="button" class="row" data-action="edit-person" data-id="${esc(p.id)}">
+      <span class="grow"><strong>${esc(p.name)}</strong><small>${hasPattern(p.id) ? (state.patterns[p.id].length + ' pattern' + (state.patterns[p.id].length === 1 ? '' : 's')) : 'No pattern yet'}</small></span>
+      <span class="chev" aria-hidden="true">${ICON_NEXT}</span></button>`).join('');
+  const types = state.types.map(t => `<button type="button" class="row" data-action="edit-type" data-id="${esc(t.id)}">
+      ${blockHTML(t.id)}
+      <span class="grow"><strong>${esc(t.name)}</strong><small>${esc(typeSummary(t))}</small></span>
+      ${t.off ? '<span class="tag">Day off</span>' : ''}
+      <span class="chev" aria-hidden="true">${ICON_NEXT}</span></button>`).join('');
+
+  let patternBlock = '<p class="muted">Add a person first.</p>';
+  if (state.people.length) {
+    const pp = (ui.patPerson && personById(ui.patPerson)) ? ui.patPerson : activePerson();
+    const list = state.patterns[pp] || [];
+    const segs = list.map((s, i) => {
+      const next = list[i + 1];
+      const until = next ? ` · until ${fmtLong(numToKey(keyToNum(next.start) - 1))}` : ' · ongoing';
+      return `<button type="button" class="seg" data-action="edit-pattern" data-pid="${esc(pp)}" data-sid="${esc(s.id)}">
+        <span class="meta"><strong>From ${fmtLong(s.start)}</strong><small>${s.slots.length}-day cycle${until}</small></span>
+        <span class="minislots">${s.slots.map(v => blockHTML(v, 'sm')).join('')}</span></button>`;
+    }).join('');
+    patternBlock = `
+      <div class="chips" role="group" aria-label="Whose patterns">${state.people.map(p =>
+        `<button type="button" class="chip" data-action="pick-pat-person" data-id="${esc(p.id)}" aria-pressed="${p.id === pp}">${esc(p.name)}</button>`).join('')}</div>
+      ${segs || '<p class="muted">No pattern yet.</p>'}
+      <div><button type="button" class="btn primary" data-action="add-pattern" data-pid="${esc(pp)}" ${state.types.length ? '' : 'disabled'}>${list.length ? 'Add pattern change' : 'Add pattern'}</button></div>
+      <p class="hint">${state.types.length ? 'A newer pattern takes over from its start date. Day changes you make on the calendar stay in place.' : 'Create a shift type first.'}</p>`;
+  }
+  const ws = state.settings.weekStart;
+  return `
+    <section class="card">
+      <div class="sechead"><h2 class="h">People</h2><button type="button" class="btn sm" data-action="add-person">Add person</button></div>
+      ${people ? `<div class="rows">${people}</div>` : '<p class="muted">No one added yet.</p>'}
+    </section>
+    <section class="card">
+      <div class="sechead"><h2 class="h">Shift types</h2><button type="button" class="btn sm" data-action="add-type">Add type</button></div>
+      ${types ? `<div class="rows">${types}</div>` : '<p class="muted">No shift types yet. Add your rostered shifts plus extras like Court, Training or Annual Leave.</p>'}
+    </section>
+    <section class="card">
+      <h2 class="h">Patterns</h2>
+      ${patternBlock}
+    </section>
+    <section class="card">
+      <h2 class="h">Preferences</h2>
+      <div class="sechead wrap"><span>Theme</span>
+        <span class="segmented" role="group" aria-label="Theme">${THEMES.map(([v, l]) =>
+          `<button type="button" data-action="theme" data-v="${v}" aria-pressed="${ui.theme === v}">${l}</button>`).join('')}</span></div>
+      <div class="sechead wrap"><span>Week starts on</span>
+        <span class="segmented" role="group" aria-label="Week starts on">
+          <button type="button" data-action="week-start" data-v="1" aria-pressed="${ws === 1}">Monday</button>
+          <button type="button" data-action="week-start" data-v="0" aria-pressed="${ws === 0}">Sunday</button>
+        </span></div>
+      <p class="hint">${mode === 'local' ? 'Saved on this device only. Export a backup now and then so you can restore it.' : 'Saved to your Claude account and synced across your devices. Only you can see it.'} Theme is saved on this device. App version ${APP_VERSION}.</p>
+    </section>
+    <section class="card">
+      <h2 class="h">Backup</h2>
+      <p class="hint">Your rosters live on this device only. Removing the home screen icon or clearing website data deletes them, so export a backup now and then. ${ui.lastBackup ? 'Last export: ' + fmtLong(ui.lastBackup) + '.' : 'No backup exported yet.'}</p>
+      <div class="tools">
+        <button type="button" class="btn primary" data-action="export">Export backup file</button>
+        <button type="button" class="btn" data-action="copy-backup">Copy backup text</button>
+        <button type="button" class="btn" data-action="restore-open">Restore from backup</button>
+      </div>
+      <p class="hint" id="backup-msg" role="status"></p>
+    </section>`;
+}
+
+/* ---------- Sheets ---------- */
+function openSheet(obj) {
+  sheet = obj;
+  renderSheet();
+  $('#sheet').hidden = false;
+  document.body.style.overflow = 'hidden';
+  const focusEl = obj.focus ? $(obj.focus) : null;
+  (focusEl || $('#sheet-panel')).focus({ preventScroll: true });
+}
+function closeSheet() {
+  sheet = null;
+  $('#sheet').hidden = true;
+  $('#sheet-panel').innerHTML = '';
+  document.body.style.overflow = '';
+}
+function sheetHead(title, sub) {
+  return `<div class="sheethead"><div><h2 id="sheet-title" class="h">${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div>
+    <button type="button" class="iconbtn" data-action="sheet-close" aria-label="Close">${ICON_CLOSE}</button></div>`;
+}
+function renderSheet() {
+  if (!sheet) return;
+  const panel = $('#sheet-panel');
+  const top = panel.scrollTop;
+  const fn = { day: sheetDay, cday: sheetCDay, restore: sheetRestore, type: sheetType, person: sheetPerson, pattern: sheetPattern, confirm: sheetConfirm }[sheet.kind];
+  panel.innerHTML = fn(sheet);
+  panel.scrollTop = top;
+}
+function sheetDay(s) {
+  const r = resolve(s.pid, s.key);
+  const p = personById(s.pid);
+  const opts = [{ val: '__roster', name: 'As rostered', sub: describe(r.base, s.key), sw: '<span class="sw roster"></span>' }];
+  for (const t of state.types) opts.push({ val: t.id, name: t.name, sub: timeRange(startFor(t, s.key), t.len) || (t.off ? 'Day off' : ''), sw: `<span class="sw" style="background:${safeColor(t.color)}"></span>` });
+  opts.push({ val: 'off', name: 'Off', sub: '', sw: '<span class="sw offsw"></span>' });
+  return `${sheetHead(fmtLong(s.key), `${esc(p.name)} · rostered: ${esc(describe(r.base, s.key))}`)}
+    <div class="opts">${opts.map(o => `<button type="button" class="opt" data-action="day-choose" data-val="${esc(o.val)}" aria-pressed="${s.choice === o.val}">${o.sw}<span class="optx"><span>${esc(o.name)}</span>${o.sub ? `<small>${esc(o.sub)}</small>` : ''}</span></button>`).join('')}</div>
+    ${state.types.length ? '' : '<p class="hint">Add shift types in Setup to see them here.</p>'}
+    <div class="field">
+      <label for="f-until">Repeat through (optional)</label>
+      <input class="input" type="date" id="f-until" data-field="until" min="${s.key}" value="${esc(s.until || '')}">
+      <small class="muted">Applies the same shift choice to every day up to this date. Handy for a block of leave.</small>
+      ${s.err ? `<small class="err">${esc(s.err)}</small>` : ''}
+    </div>
+    ${noteField(s)}
+    <div class="actions"><button type="button" class="btn" data-action="sheet-close">Cancel</button><button type="button" class="btn primary" data-action="day-save">Save</button></div>`;
+}
+function noteField(s) {
+  return `<div class="field">
+      <label for="f-note">Note for this date</label>
+      <textarea class="input" id="f-note" data-field="note" rows="3" maxlength="500" placeholder="e.g. Court at Albany Magistrates 0930">${esc(s.note)}</textarea>
+      <small class="muted">Shared: shows on every person's calendar for ${fmtShort(s.key)}. Clear the text to remove it.</small>
+    </div>`;
+}
+function sheetCDay(s) {
+  const [a, b] = comparePair();
+  const row = pid => {
+    const r = resolve(pid, s.key);
+    return `<div class="row static">${blockHTML(r.val)}<span class="grow"><strong>${esc(personById(pid).name)}</strong><small>${esc(describe(r.val, s.key))}</small></span></div>`;
+  };
+  const both = isOff(resolve(a, s.key).val) && isOff(resolve(b, s.key).val);
+  return `${sheetHead(fmtLong(s.key), both ? 'Both off' : '')}
+    <div class="rows">${row(a)}${row(b)}</div>
+    ${noteField(s)}
+    <div class="actions"><button type="button" class="btn" data-action="sheet-close">Cancel</button><button type="button" class="btn primary" data-action="cday-save">Save note</button></div>`;
+}
+function sheetType(s) {
+  const d = s.draft;
+  const c = safeColor(d.color);
+  const isPreset = PRESETS.some(([pc]) => pc === c);
+  return `${sheetHead(d.id ? 'Edit shift type' : 'New shift type')}
+    <div><span class="blk lg" id="type-prev" style="background:${c};color:${textOn(c)}">${esc(labelOf(d) || 'Label')}</span></div>
+    <div class="field">
+      <label for="f-name">Name</label>
+      <input class="input" id="f-name" data-field="name" maxlength="30" autocomplete="off" placeholder="e.g. Court" value="${esc(d.name)}">
+    </div>
+    <div class="field">
+      <label for="f-label">Calendar label</label>
+      <input class="input" id="f-label" data-field="label" maxlength="5" autocomplete="off" placeholder="${esc(autoLabel(d.name) || 'Auto')}" value="${esc(d.label)}">
+      <small class="muted">Up to 5 characters, shown in each calendar square. Leave blank to use the placeholder.</small>
+    </div>
+    <div class="field">
+      <span class="lbl">Colour</span>
+      <div class="swatches">${PRESETS.map(([pc, name]) => `<button type="button" class="swatch" data-action="type-colour" data-c="${pc}" style="background:${pc}" aria-label="${name}" aria-pressed="${pc === c}"></button>`).join('')}
+        <span class="swatch custom" aria-pressed="${!isPreset}" title="Custom colour"><input type="color" id="f-color" data-field="color" value="${c}" aria-label="Custom colour"></span></div>
+    </div>
+    <div class="twocol">
+      <div class="field">
+        <label for="f-start">Start time (optional)</label>
+        <input class="input" type="time" id="f-start" data-field="start" value="${esc(d.start)}">
+      </div>
+      <div class="field">
+        <label for="f-len">Length in hours (optional)</label>
+        <input class="input" type="number" id="f-len" data-field="len" inputmode="decimal" min="0.25" max="24" step="0.25" placeholder="e.g. 10" value="${esc(d.len)}">
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Start time rules</span>
+      ${d.rules.map((r, i) => `<div class="rule">
+        <div class="daychips" role="group" aria-label="Days for rule ${i + 1}">${weekOrder().map(wd =>
+          `<button type="button" class="daychip" data-action="rule-day" data-i="${i}" data-d="${wd}" aria-pressed="${r.days.includes(wd)}">${DOW[wd]}</button>`).join('')}</div>
+        <div class="rulerow">
+          <label for="f-rs-${i}">Starts at</label>
+          <input class="input" type="time" id="f-rs-${i}" data-field="rule-start" data-i="${i}" value="${esc(r.start)}">
+          <button type="button" class="btn sm danger" data-action="rule-del" data-i="${i}">Remove</button>
+        </div>
+      </div>`).join('')}
+      <div><button type="button" class="btn sm" data-action="rule-add">Add start time rule</button></div>
+      <small class="muted">On the days you tick, the rule's start time replaces the default. The length stays the same, so the finish time moves too.</small>
+    </div>
+    <label class="check" for="f-off"><input type="checkbox" id="f-off" data-field="off" ${d.off ? 'checked' : ''}>
+      <span><strong>Counts as a day off</strong><small>Tick this for leave types so Compare treats them as days off.</small></span></label>
+    ${s.err ? `<p class="err" style="margin:0">${esc(s.err)}</p>` : ''}
+    <div class="actions">${d.id ? '<button type="button" class="btn danger" data-action="type-delete">Delete</button><span class="spacer"></span>' : ''}
+      <button type="button" class="btn" data-action="sheet-close">Cancel</button><button type="button" class="btn primary" data-action="type-save">Save</button></div>`;
+}
+function sheetPerson(s) {
+  const d = s.draft;
+  return `${sheetHead(d.id ? 'Edit person' : 'Add person')}
+    <div class="field">
+      <label for="f-pname">Name</label>
+      <input class="input" id="f-pname" data-field="name" maxlength="40" autocomplete="off" value="${esc(d.name)}">
+      ${s.err ? `<small class="err">${esc(s.err)}</small>` : ''}
+    </div>
+    <div class="actions">${d.id ? '<button type="button" class="btn danger" data-action="person-delete">Delete</button><span class="spacer"></span>' : ''}
+      <button type="button" class="btn" data-action="sheet-close">Cancel</button><button type="button" class="btn primary" data-action="person-save">Save</button></div>`;
+}
+function previewStrip(d) {
+  if (!d.slots.length || !isKey(d.start)) return '<span class="muted">Add shifts to see the first two weeks.</span>';
+  const s = keyToNum(d.start);
+  return `<div class="strip">${Array.from({ length: 14 }, (_, i) => {
+    const k = numToKey(s + i);
+    const v = d.slots[i % d.slots.length];
+    const t = v && v !== 'off' ? typeById(v) : null;
+    const st = t ? startFor(t, k) : '';
+    return `<div class="sday"><span>${DOW[keyDate(k).getUTCDay()]}</span><span class="d">${+k.slice(8)} ${MON[+k.slice(5, 7) - 1]}</span>${blockHTML(v, 'sm')}<span class="d">${st ? fmtTime(st) : ''}</span></div>`;
+  }).join('')}</div>`;
+}
+function sheetPattern(s) {
+  const d = s.draft;
+  const p = personById(d.pid);
+  const slots = d.slots.map((v, i) => `<button type="button" class="slot" data-action="pat-slot" data-i="${i}" aria-pressed="${s.sel === i}" aria-label="Slot ${i + 1}: ${esc(describe(v))}"><span class="idx">${i + 1}</span>${blockHTML(v, 'sm')}</button>`).join('');
+  const palette = state.types.map(t => `<button type="button" data-action="pat-add" data-val="${esc(t.id)}"><span class="sw" style="background:${safeColor(t.color)}"></span>${esc(t.name)}</button>`).join('')
+    + `<button type="button" data-action="pat-add" data-val="off"><span class="sw offsw"></span>Off</button>`;
+  return `${sheetHead(d.sid ? 'Edit pattern' : 'New pattern', esc(p.name))}
+    <div class="field">
+      <label for="f-pstart">Start date</label>
+      <input class="input" type="date" id="f-pstart" data-field="start" value="${esc(d.start)}">
+      <small class="muted">Slot 1 falls on this date, then the cycle repeats.</small>
+    </div>
+    <div class="field">
+      <span class="lbl">Cycle · ${d.slots.length} day${d.slots.length === 1 ? '' : 's'}</span>
+      ${slots ? `<div class="slots">${slots}</div>` : '<p class="muted" style="margin:0">Tap shifts below in order to build the cycle.</p>'}
+    </div>
+    <div class="field">
+      <span class="lbl">${s.sel != null ? `Replace slot ${s.sel + 1} with` : 'Add to the end'}</span>
+      <div class="palette">${palette}</div>
+      <div class="tools">
+        ${s.sel != null ? `<button type="button" class="btn sm" data-action="pat-remove">Remove slot ${s.sel + 1}</button>` : ''}
+        ${d.slots.length && s.sel == null ? '<button type="button" class="btn sm" data-action="pat-undo">Undo last</button>' : ''}
+        ${d.slots.length ? '<button type="button" class="btn sm" data-action="pat-clear">Clear all</button>' : ''}
+      </div>
+      <small class="muted">Tap a slot to select it, then tap a shift to swap it in.</small>
+    </div>
+    <div class="field">
+      <span class="lbl">First two weeks</span>
+      <div class="strip-wrap" id="pat-prev">${previewStrip(d)}</div>
+    </div>
+    ${s.err ? `<p class="err" style="margin:0">${esc(s.err)}</p>` : ''}
+    <div class="actions">${d.sid ? '<button type="button" class="btn danger" data-action="pat-delete">Delete</button><span class="spacer"></span>' : ''}
+      <button type="button" class="btn" data-action="sheet-close">Cancel</button><button type="button" class="btn primary" data-action="pat-save">Save</button></div>`;
+}
+function sheetConfirm(s) {
+  return `${sheetHead(esc(s.title))}
+    <p style="margin:0">${esc(s.body)}</p>
+    <div class="actions"><button type="button" class="btn" data-action="sheet-close">Cancel</button><button type="button" class="btn primary" data-action="confirm-yes" style="background:var(--danger);border-color:var(--danger);color:#fff">${esc(s.yes)}</button></div>`;
+}
+
+/* ---------- Backup ---------- */
+function backupJSON() {
+  return JSON.stringify({ app: 'shift-roster', version: 1, exported: new Date().toISOString(), data: state }, null, 1);
+}
+function backupMsg(text) { const el = $('#backup-msg'); if (el) el.textContent = text; }
+function markBackup() { ui.lastBackup = todayKey(); saveUI(); render(); }
+async function exportBackup() {
+  const name = `roster-backup-${todayKey()}.json`;
+  const file = new File([backupJSON()], name, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Roster backup' });
+      markBackup(); backupMsg('Backup shared. Save it to Files, Notes or an email.');
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  markBackup(); backupMsg(`Saved ${name} to your downloads.`);
+}
+async function copyBackup() {
+  try { await navigator.clipboard.writeText(backupJSON()); markBackup(); backupMsg('Backup copied. Paste it into Notes or an email to keep it.'); }
+  catch (_) { backupMsg('Copying was blocked. Use Export backup file instead.'); }
+}
+function parseBackup(text) {
+  const obj = JSON.parse(text);
+  const data = obj && obj.app === 'shift-roster' && obj.data ? obj.data : obj;
+  if (!data || !Array.isArray(data.people) || !Array.isArray(data.types)) throw new Error('not a roster backup');
+  return { data: normalise(data), exported: obj && typeof obj.exported === 'string' ? obj.exported.slice(0, 10) : null };
+}
+function sheetRestore(s) {
+  const p = s.parsed;
+  const summary = p ? `<p class="card tight" style="margin:0">Backup${p.exported && isKey(p.exported) ? ' from ' + fmtLong(p.exported) : ''}: ${p.data.people.length} ${p.data.people.length === 1 ? 'person' : 'people'}, ${p.data.types.length} shift type${p.data.types.length === 1 ? '' : 's'}, ${Object.keys(p.data.notes).length} note${Object.keys(p.data.notes).length === 1 ? '' : 's'}.</p>` : '';
+  return `${sheetHead('Restore from backup')}
+    <div class="field">
+      <label for="f-file">Backup file</label>
+      <input class="input" type="file" id="f-file" accept=".json,application/json,text/plain">
+    </div>
+    <div class="field">
+      <label for="f-paste">Or paste backup text</label>
+      <textarea class="input" id="f-paste" data-field="paste" rows="4" placeholder="Paste the copied backup here">${esc(s.text || '')}</textarea>
+    </div>
+    ${summary}
+    ${s.err ? `<p class="err" style="margin:0">${esc(s.err)}</p>` : ''}
+    <p class="hint">Restoring replaces everything in the app on this device.</p>
+    <div class="actions"><button type="button" class="btn" data-action="sheet-close">Cancel</button><button type="button" class="btn primary" data-action="restore-go">Restore</button></div>`;
+}
+function restoreGo() {
+  let parsed = sheet.parsed;
+  if (!parsed) {
+    try { parsed = parseBackup(sheet.text || ''); }
+    catch (_) { sheet.err = 'That isn\'t a roster backup. Pick the exported .json file or paste the copied text.'; renderSheet(); return; }
+  }
+  openSheet({ kind: 'confirm', title: 'Replace everything?', yes: 'Restore',
+    body: `Everything in the app on this device will be replaced with the backup (${parsed.data.people.length} ${parsed.data.people.length === 1 ? 'person' : 'people'}).`,
+    onYes: () => { state = parsed.data; } });
+}
+
+/* ---------- Actions ---------- */
+function openDay(key) {
+  const pid = activePerson();
+  if (!pid) return;
+  const r = resolve(pid, key);
+  openSheet({ kind: 'day', pid, key, choice: r.overridden ? r.val : '__roster', until: '', note: state.notes[key] || '', err: '' });
+}
+function saveDay() {
+  const s = sheet;
+  let end = s.key;
+  if (s.until) {
+    if (!isKey(s.until) || s.until < s.key) { s.err = 'Pick a date on or after this day.'; renderSheet(); return; }
+    if (keyToNum(s.until) - keyToNum(s.key) >= MAX_RANGE) { s.err = 'Keep a repeat to one year or less.'; renderSheet(); return; }
+    end = s.until;
+  }
+  setNote(s.key, s.note);
+  const map = state.overrides[s.pid] || (state.overrides[s.pid] = {});
+  for (let n = keyToNum(s.key); n <= keyToNum(end); n++) {
+    const k = numToKey(n);
+    if (s.choice === '__roster' || patternSlot(s.pid, k) === s.choice) delete map[k];
+    else map[k] = s.choice;
+  }
+  if (!Object.keys(map).length) delete state.overrides[s.pid];
+  closeSheet();
+  commit();
+}
+function setNote(key, text) {
+  const t = String(text || '').trim().slice(0, 500);
+  if (t) state.notes[key] = t; else delete state.notes[key];
+}
+function openType(id) {
+  const t = id ? typeById(id) : null;
+  const used = new Set(state.types.map(x => x.color));
+  const fresh = (PRESETS.find(([c]) => !used.has(c)) || PRESETS[0])[0];
+  openSheet({ kind: 'type', err: '', focus: t ? null : '#f-name',
+    draft: t
+      ? { ...t, len: t.len == null ? '' : String(t.len), rules: t.rules.map(r => ({ days: [...r.days], start: r.start })) }
+      : { id: null, name: '', label: '', color: fresh, start: '', len: '', rules: [], off: false } });
+}
+function saveType() {
+  const d = sheet.draft;
+  const fail = msg => { sheet.err = msg; renderSheet(); };
+  const name = d.name.trim();
+  if (!name) return fail('Give the shift a name.');
+  let len = null;
+  const lenRaw = String(d.len == null ? '' : d.len).trim();
+  if (lenRaw !== '') {
+    len = Number(lenRaw);
+    if (!(len > 0 && len <= 24)) return fail('Length must be more than 0 and no more than 24 hours.');
+    len = Math.round(len * 100) / 100;
+  }
+  const seen = new Set();
+  for (const r of d.rules) {
+    if (!r.days.length) return fail('Tick at least one day in each start time rule.');
+    if (!/^\d{2}:\d{2}$/.test(r.start)) return fail('Give each start time rule a start time.');
+    for (const wd of r.days) {
+      if (seen.has(wd)) return fail(`${DOW[wd]} appears in more than one rule. Each day can only have one.`);
+      seen.add(wd);
+    }
+  }
+  const clean = {
+    name: name.slice(0, 30), label: d.label.trim().slice(0, 5), color: safeColor(d.color),
+    start: /^\d{2}:\d{2}$/.test(d.start) ? d.start : '', off: !!d.off, len,
+    rules: d.rules.map(r => ({ days: [...r.days].sort(), start: r.start }))
+  };
+  if (d.id) Object.assign(typeById(d.id), clean);
+  else state.types.push({ id: newId(), ...clean });
+  closeSheet();
+  commit();
+}
+function deleteType() {
+  const id = sheet.draft.id;
+  const t = typeById(id);
+  let slots = 0, ovs = 0;
+  for (const pid in state.patterns) for (const seg of state.patterns[pid]) for (const v of seg.slots) if (v === id) slots++;
+  for (const pid in state.overrides) for (const k in state.overrides[pid]) if (state.overrides[pid][k] === id) ovs++;
+  const bits = [];
+  if (slots) bits.push(`${slots} pattern slot${slots === 1 ? '' : 's'} will change to Off`);
+  if (ovs) bits.push(`${ovs} calendar change${ovs === 1 ? '' : 's'} will go back to the rostered shift`);
+  openSheet({ kind: 'confirm', title: `Delete ${t.name}?`, yes: 'Delete',
+    body: bits.length ? `${bits.join(', and ')}.` : 'It isn\'t used anywhere yet.',
+    onYes: () => {
+      state.types = state.types.filter(x => x.id !== id);
+      for (const pid in state.patterns) for (const seg of state.patterns[pid]) seg.slots = seg.slots.map(v => v === id ? 'off' : v);
+      for (const pid in state.overrides) {
+        for (const k in state.overrides[pid]) if (state.overrides[pid][k] === id) delete state.overrides[pid][k];
+        if (!Object.keys(state.overrides[pid]).length) delete state.overrides[pid];
+      }
+    } });
+}
+function openPerson(id) {
+  const p = id ? personById(id) : null;
+  openSheet({ kind: 'person', err: '', focus: '#f-pname', draft: p ? { ...p } : { id: null, name: '' } });
+}
+function savePerson() {
+  const d = sheet.draft;
+  const name = d.name.trim();
+  if (!name) { sheet.err = 'Enter a name.'; renderSheet(); return; }
+  if (state.people.some(p => p.id !== d.id && p.name.toLowerCase() === name.toLowerCase())) { sheet.err = 'Someone already has that name.'; renderSheet(); return; }
+  if (d.id) personById(d.id).name = name.slice(0, 40);
+  else {
+    const id = newId();
+    state.people.push({ id, name: name.slice(0, 40) });
+    if (!ui.person) { ui.person = id; saveUI(); }
+  }
+  closeSheet();
+  commit();
+}
+function deletePerson() {
+  const p = personById(sheet.draft.id);
+  openSheet({ kind: 'confirm', title: `Delete ${p.name}?`, yes: 'Delete',
+    body: `This removes ${p.name}'s patterns and calendar changes as well.`,
+    onYes: () => {
+      state.people = state.people.filter(x => x.id !== p.id);
+      delete state.patterns[p.id];
+      delete state.overrides[p.id];
+    } });
+}
+function openPattern(pid, sid) {
+  if (!pid || !personById(pid)) return;
+  const seg = sid ? (state.patterns[pid] || []).find(x => x.id === sid) : null;
+  openSheet({ kind: 'pattern', sel: null, err: '',
+    draft: { pid, sid: seg ? seg.id : null, start: seg ? seg.start : todayKey(), slots: seg ? [...seg.slots] : [] } });
+}
+function savePattern() {
+  const d = sheet.draft;
+  const p = personById(d.pid);
+  if (!isKey(d.start)) { sheet.err = 'Pick a start date.'; renderSheet(); return; }
+  if (!d.slots.length) { sheet.err = 'Add at least one shift to the cycle.'; renderSheet(); return; }
+  const list = state.patterns[d.pid] || (state.patterns[d.pid] = []);
+  if (list.some(x => x.id !== d.sid && x.start === d.start)) { sheet.err = `Another pattern for ${p.name} already starts on ${fmtLong(d.start)}.`; renderSheet(); return; }
+  if (d.sid) { const seg = list.find(x => x.id === d.sid); seg.start = d.start; seg.slots = [...d.slots]; }
+  else list.push({ id: newId(), start: d.start, slots: [...d.slots] });
+  list.sort((x, y) => x.start < y.start ? -1 : 1);
+  ui.patPerson = d.pid; saveUI();
+  closeSheet();
+  commit();
+}
+function deletePattern() {
+  const d = sheet.draft;
+  const seg = (state.patterns[d.pid] || []).find(x => x.id === d.sid);
+  openSheet({ kind: 'confirm', title: 'Delete this pattern?', yes: 'Delete',
+    body: `The pattern starting ${fmtLong(seg.start)} will be removed. Any earlier pattern carries on in its place.`,
+    onYes: () => {
+      state.patterns[d.pid] = state.patterns[d.pid].filter(x => x.id !== d.sid);
+      if (!state.patterns[d.pid].length) delete state.patterns[d.pid];
+    } });
+}
+function shiftMonth(delta) {
+  let m = ui.m + delta, y = ui.y;
+  while (m < 0) { m += 12; y--; }
+  while (m > 11) { m -= 12; y++; }
+  ui.m = m; ui.y = y;
+  render();
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el || el.disabled) return;
+  const a = el.dataset.action;
+  if (mode === 'loading' || mode === 'error') { if (a !== 'retry') return; }
+  switch (a) {
+    case 'retry': if (sync === 'error' && mode === 'cloud') { dirty = true; flush(); } break;
+    case 'prev': shiftMonth(-1); break;
+    case 'next': shiftMonth(1); break;
+    case 'today': { const t = new Date(); ui.y = t.getFullYear(); ui.m = t.getMonth(); render(); break; }
+    case 'jump': { const k = el.dataset.key; ui.y = +k.slice(0, 4); ui.m = +k.slice(5, 7) - 1; render(); window.scrollTo({ top: 0 }); break; }
+    case 'pick-person': ui.person = el.dataset.id; saveUI(); render(); break;
+    case 'pick-pat-person': ui.patPerson = el.dataset.id; saveUI(); render(); break;
+    case 'day': openDay(el.dataset.key); break;
+    case 'cday': openSheet({ kind: 'cday', key: el.dataset.key, note: state.notes[el.dataset.key] || '' }); break;
+    case 'cday-save': setNote(sheet.key, sheet.note); closeSheet(); commit(); break;
+    case 'add-person': openPerson(null); break;
+    case 'edit-person': openPerson(el.dataset.id); break;
+    case 'add-type': openType(null); break;
+    case 'edit-type': openType(el.dataset.id); break;
+    case 'add-pattern': openPattern(el.dataset.pid || activePerson(), null); break;
+    case 'edit-pattern': openPattern(el.dataset.pid, el.dataset.sid); break;
+    case 'export': exportBackup(); break;
+    case 'copy-backup': copyBackup(); break;
+    case 'restore-open': openSheet({ kind: 'restore', text: '', parsed: null, err: '' }); break;
+    case 'restore-go': restoreGo(); break;
+    case 'theme': ui.theme = el.dataset.v; saveUI(); applyTheme(); render(); break;
+    case 'week-start': state.settings.weekStart = +el.dataset.v === 0 ? 0 : 1; commit(); break;
+    case 'sheet-close': closeSheet(); break;
+    case 'day-choose': sheet.choice = el.dataset.val; renderSheet(); break;
+    case 'day-save': saveDay(); break;
+    case 'type-colour': sheet.draft.color = el.dataset.c; renderSheet(); break;
+    case 'type-save': saveType(); break;
+    case 'rule-add': if (sheet.draft.rules.length < 7) sheet.draft.rules.push({ days: [], start: '' }); sheet.err = ''; renderSheet(); break;
+    case 'rule-del': sheet.draft.rules.splice(+el.dataset.i, 1); sheet.err = ''; renderSheet(); break;
+    case 'rule-day': {
+      sheet.err = '';
+      const r = sheet.draft.rules[+el.dataset.i], wd = +el.dataset.d;
+      r.days = r.days.includes(wd) ? r.days.filter(x => x !== wd) : [...r.days, wd];
+      renderSheet(); break;
+    }
+    case 'type-delete': deleteType(); break;
+    case 'person-save': savePerson(); break;
+    case 'person-delete': deletePerson(); break;
+    case 'pat-slot': { const i = +el.dataset.i; sheet.sel = sheet.sel === i ? null : i; renderSheet(); break; }
+    case 'pat-add': {
+      const v = el.dataset.val;
+      if (sheet.sel != null) { sheet.draft.slots[sheet.sel] = v; sheet.sel = null; }
+      else if (sheet.draft.slots.length < MAX_SLOTS) sheet.draft.slots.push(v);
+      else sheet.err = `A cycle can hold up to ${MAX_SLOTS} days.`;
+      renderSheet(); break;
+    }
+    case 'pat-remove': sheet.draft.slots.splice(sheet.sel, 1); sheet.sel = null; renderSheet(); break;
+    case 'pat-undo': sheet.draft.slots.pop(); renderSheet(); break;
+    case 'pat-clear': sheet.draft.slots = []; sheet.sel = null; renderSheet(); break;
+    case 'pat-save': savePattern(); break;
+    case 'pat-delete': deletePattern(); break;
+    case 'confirm-yes': { const fn = sheet.onYes; closeSheet(); fn(); commit(); break; }
+  }
+});
+
+document.addEventListener('input', e => {
+  const f = e.target.dataset && e.target.dataset.field;
+  if (!f || !sheet) return;
+  const v = e.target.value;
+  if (sheet.kind === 'type') {
+    if (f === 'off') return;
+    if (f === 'rule-start') { const r = sheet.draft.rules[+e.target.dataset.i]; if (r) r.start = v; return; }
+    sheet.draft[f] = v;
+    const prev = $('#type-prev');
+    if (prev) {
+      const c = safeColor(sheet.draft.color);
+      prev.style.background = c; prev.style.color = textOn(c);
+      prev.textContent = labelOf(sheet.draft) || 'Label';
+    }
+    if (f === 'name') { const lab = $('#f-label'); if (lab) lab.placeholder = autoLabel(v) || 'Auto'; }
+  } else if (sheet.kind === 'person') {
+    sheet.draft.name = v;
+  } else if (sheet.kind === 'restore' && f === 'paste') {
+    sheet.text = v; sheet.parsed = null;
+  } else if ((sheet.kind === 'day' || sheet.kind === 'cday') && f === 'note') {
+    sheet.note = v;
+  } else if (sheet.kind === 'day' && f === 'until') {
+    sheet.until = v;
+  } else if (sheet.kind === 'pattern' && f === 'start') {
+    sheet.draft.start = v;
+    const prev = $('#pat-prev');
+    if (prev) prev.innerHTML = previewStrip(sheet.draft);
+  }
+});
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'cmp-a' || t.id === 'cmp-b') {
+    const [a, b] = comparePair();
+    if (t.id === 'cmp-a') { ui.a = t.value; ui.b = t.value === b ? a : b; }
+    else { ui.b = t.value; ui.a = t.value === a ? b : a; }
+    saveUI(); render();
+    return;
+  }
+  if (!sheet) return;
+  if (sheet.kind === 'restore' && t.id === 'f-file' && t.files && t.files[0]) {
+    t.files[0].text().then(text => {
+      if (!sheet || sheet.kind !== 'restore') return;
+      try { sheet.parsed = parseBackup(text); sheet.err = ''; }
+      catch (_) { sheet.parsed = null; sheet.err = 'That file isn\'t a roster backup.'; }
+      renderSheet();
+    });
+    return;
+  }
+  if (sheet.kind === 'type' && t.dataset.field === 'off') sheet.draft.off = t.checked;
+  if (sheet.kind === 'type' && t.dataset.field === 'color') { sheet.draft.color = t.value; renderSheet(); }
+});
+
+document.addEventListener('keydown', e => {
+  if (!sheet) return;
+  if (e.key === 'Escape') { closeSheet(); return; }
+  if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') {
+    e.preventDefault();
+    if (sheet.kind === 'person') savePerson();
+    else if (sheet.kind === 'type') saveType();
+  }
+});
+
+window.addEventListener('hashchange', () => { closeSheet(); render(); window.scrollTo({ top: 0 }); });
+
+init();
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+</script>
+</body>
+</html>
