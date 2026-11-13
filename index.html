@@ -222,13 +222,32 @@ main { padding: 14px calc(16px + env(safe-area-inset-right)) 24px calc(16px + en
 .marklegend span.item { display: inline-flex; align-items: center; gap: 6px; }
 .notes { display: flex; flex-direction: column; }
 .noterow {
-  display: grid; grid-template-columns: 92px 1fr; gap: 10px; width: 100%; text-align: left;
+  display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; width: 100%; text-align: left;
   padding: 9px 2px; border: 0; border-top: 1px solid var(--line); background: none;
 }
 .noterow:first-child { border-top: 0; }
 .noterow .nd { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .noterow .nt { white-space: pre-wrap; overflow-wrap: anywhere; }
 .notebox { white-space: pre-wrap; overflow-wrap: anywhere; }
+.panelhead {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  background: none; border: 0; padding: 4px 0; text-align: left;
+}
+.panelhead .count {
+  font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.panelhead .fold { display: inline-flex; color: var(--muted); transition: transform 0.15s ease; }
+.panelhead .fold svg { width: 18px; height: 18px; }
+.panelhead .fold.open { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .panelhead .fold { transition: none; } }
+.noterow .pen { display: inline-flex; color: var(--muted); align-self: center; }
+.noterow .pen svg { width: 16px; height: 16px; }
+.noteedit {
+  display: flex; flex-direction: column; gap: 10px; margin: 6px 0;
+  padding: 12px; border: 1px solid var(--accent); border-radius: 10px; background: var(--bg);
+}
+.noteedit .input { background-color: var(--surface); }
 textarea.input { resize: vertical; min-height: 84px; line-height: 1.4; }
 .row.static { cursor: default; }
 .ccell.both { background: var(--good-tint); border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
@@ -467,13 +486,15 @@ const LS_DATA = 'shift-roster-data-v1';
 const LS_UI = 'shift-roster-ui-v1';
 const VIEWS = ['calendar', 'compare', 'setup'];
 const MAX_SLOTS = 120;
-const APP_VERSION = '6 (standalone)';
+const APP_VERSION = '7 (standalone)';
 const THEMES = [['auto', 'Match phone'], ['light', 'Light'], ['dark', 'Dark']];
 const MAX_RANGE = 366;
 const ICON_PREV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
 const ICON_NEXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
 const NOTE_MARK = '<svg class="notemark" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M2 1h5.6L10 3.4V11H2z"/></svg>';
 const OV_MARK = '<span class="ovdot" aria-hidden="true"></span>';
+const ICON_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l7 7 7-7"/></svg>';
+const ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
 const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -560,6 +581,7 @@ let state = blankState();
 const now = new Date();
 const ui = { person: null, a: null, b: null, patPerson: null, theme: 'auto', y: now.getFullYear(), m: now.getMonth() };
 let sheet = null;
+let noteEdit = null; // { mode: 'add' | 'edit', key, text, err, prefilled } while a note is open in the panel
 
 const typeById = id => state.types.find(t => t.id === id);
 const personById = id => state.people.find(p => p.id === id);
@@ -681,10 +703,11 @@ function loadUI() {
     for (const k of ['person', 'a', 'b', 'patPerson']) if (typeof u[k] === 'string') ui[k] = u[k];
     if (THEMES.some(([v]) => v === u.theme)) ui.theme = u.theme;
     if (isKey(u.lastBackup)) ui.lastBackup = u.lastBackup;
+    if (typeof u.notesCollapsed === 'boolean') ui.notesCollapsed = u.notesCollapsed;
   } catch (_) { /* storage unavailable */ }
 }
 function saveUI() {
-  try { localStorage.setItem(LS_UI, JSON.stringify({ person: ui.person, a: ui.a, b: ui.b, patPerson: ui.patPerson, theme: ui.theme, lastBackup: ui.lastBackup || null })); } catch (_) { /* ignore */ }
+  try { localStorage.setItem(LS_UI, JSON.stringify({ person: ui.person, a: ui.a, b: ui.b, patPerson: ui.patPerson, theme: ui.theme, lastBackup: ui.lastBackup || null, notesCollapsed: !!ui.notesCollapsed })); } catch (_) { /* ignore */ }
 }
 function applyTheme() {
   const root = document.documentElement;
@@ -874,12 +897,7 @@ function viewCalendar() {
     parts.push(`<div class="card note"><span>No pattern set for ${esc(person.name)} yet.</span>
       <button type="button" class="btn sm primary" data-action="add-pattern" data-pid="${esc(pid)}" ${state.types.length ? '' : 'disabled'}>Build pattern</button></div>`);
   }
-  const prefix = `${ui.y}-${pad(ui.m + 1)}-`;
-  const monthNotes = Object.keys(state.notes).filter(k => k.startsWith(prefix)).sort();
-  if (monthNotes.length) {
-    parts.push(`<section class="card tight"><h3 class="h sm">${MONTH_FULL[ui.m]} notes</h3><div class="notes">${monthNotes.map(k =>
-      `<button type="button" class="noterow" data-action="day" data-key="${k}"><span class="nd">${fmtShort(k)}</span><span class="nt">${esc(state.notes[k])}</span></button>`).join('')}</div></section>`);
-  }
+  parts.push(notesPanel());
   const legend = [];
   for (const t of state.types) {
     const n = counts.get(t.id);
@@ -889,6 +907,64 @@ function viewCalendar() {
   if (legend.length) parts.push(`<section class="card tight"><h3 class="h sm">${MONTH_FULL[ui.m]} totals</h3><ul class="legend">${legend.join('')}</ul></section>`);
   parts.push(`<p class="hint marklegend"><span>Tap a day to change its shift or add a note.</span><span class="item">${OV_MARK}Changed from pattern</span><span class="item">${NOTE_MARK}Has a note</span></p>`);
   return parts.join('');
+}
+// Upcoming notes panel: today onwards, any month. Past notes keep their calendar icon but leave this list.
+function noteForm(ne) {
+  const isAdd = ne.mode === 'add';
+  const existing = isAdd && isKey(ne.key) && state.notes[ne.key];
+  return `<div class="noteedit">
+    ${isAdd
+      ? `<div class="field"><label for="ne-date">Date</label><input class="input" type="date" id="ne-date" data-field="ne-date" min="${todayKey()}" value="${esc(ne.key || '')}"></div>`
+      : `<strong>${fmtLong(ne.key)}</strong>`}
+    <div class="field">
+      <label for="ne-text">${isAdd ? 'Note' : 'Edit note'}</label>
+      <textarea class="input" id="ne-text" data-field="ne-text" rows="3" maxlength="500" placeholder="e.g. Court at Albany Magistrates 0930">${esc(ne.text || '')}</textarea>
+      <small class="muted" id="ne-hint">${existing ? 'This date already has a note. Saving replaces it with the text above.' : (isAdd ? '' : 'Clear the text and save to remove the note.')}</small>
+    </div>
+    ${ne.err ? `<p class="err" style="margin:0">${esc(ne.err)}</p>` : ''}
+    <div class="actions">${isAdd ? '' : '<button type="button" class="btn danger" data-action="note-del">Delete</button><span class="spacer"></span>'}
+      <button type="button" class="btn" data-action="note-cancel">Cancel</button><button type="button" class="btn primary" data-action="note-save">Save</button></div>
+  </div>`;
+}
+function notesPanel() {
+  const tk = todayKey();
+  const keys = Object.keys(state.notes).filter(k => k >= tk).sort();
+  const open = !ui.notesCollapsed;
+  const adding = noteEdit && noteEdit.mode === 'add';
+  const head = `<div class="sechead">
+      <button type="button" class="panelhead" data-action="notes-toggle" aria-expanded="${open}" aria-controls="notes-body">
+        <span class="h sm">Upcoming notes</span><span class="count">${keys.length}</span>
+        <span class="fold${open ? ' open' : ''}" aria-hidden="true">${ICON_DOWN}</span>
+      </button>
+      ${open && !adding ? '<button type="button" class="btn sm" data-action="note-add">Add note</button>' : ''}
+    </div>`;
+  if (!open) return `<section class="card tight">${head}</section>`;
+  const rows = keys.map(k => (noteEdit && noteEdit.mode === 'edit' && noteEdit.key === k)
+    ? noteForm(noteEdit)
+    : `<button type="button" class="noterow" data-action="note-edit" data-key="${k}" aria-label="Edit note for ${fmtLong(k)}"><span class="nd">${k === tk ? 'Today' : fmtShort(k)}</span><span class="nt">${esc(state.notes[k])}</span><span class="pen" aria-hidden="true">${ICON_EDIT}</span></button>`).join('');
+  return `<section class="card tight">${head}
+    <div id="notes-body" class="notes">${adding ? noteForm(noteEdit) : ''}${rows || (adding ? '' : '<p class="muted" style="margin:0">No upcoming notes.</p>')}</div>
+    <p class="hint">Tap a note to edit it. Notes leave this list once their day has passed and stay on the calendar day.</p>
+  </section>`;
+}
+function focusNoteText() {
+  const ta = $('#ne-text');
+  if (!ta) return;
+  ta.focus();
+  const n = ta.value.length;
+  try { ta.setSelectionRange(n, n); } catch (_) { /* ignore */ }
+}
+function saveNoteEdit() {
+  const ne = noteEdit;
+  const text = String(ne.text || '').trim();
+  if (ne.mode === 'add') {
+    if (!isKey(ne.key)) { ne.err = 'Pick a date.'; render(); return; }
+    if (ne.key < todayKey()) { ne.err = 'Pick today or a later date. Tap a past day on the calendar to note it.'; render(); return; }
+    if (!text) { ne.err = 'Type a note first.'; render(); focusNoteText(); return; }
+  }
+  setNote(ne.key, text);
+  noteEdit = null;
+  commit();
 }
 function comparePair() {
   const a = personById(ui.a) ? ui.a : state.people[0].id;
@@ -1251,6 +1327,7 @@ function openDay(key) {
   const pid = activePerson();
   if (!pid) return;
   const r = resolve(pid, key);
+  noteEdit = null;
   openSheet({ kind: 'day', pid, key, choice: r.overridden ? r.val : '__roster', until: '', note: state.notes[key] || '', err: '' });
 }
 function saveDay() {
@@ -1424,6 +1501,23 @@ document.addEventListener('click', e => {
     case 'edit-type': openType(el.dataset.id); break;
     case 'add-pattern': openPattern(el.dataset.pid || activePerson(), null); break;
     case 'edit-pattern': openPattern(el.dataset.pid, el.dataset.sid); break;
+    case 'notes-toggle': ui.notesCollapsed = !ui.notesCollapsed; if (ui.notesCollapsed) noteEdit = null; saveUI(); render(); break;
+    case 'note-add': {
+      const k = todayKey();
+      const existing = state.notes[k];
+      noteEdit = { mode: 'add', key: k, text: existing || '', err: '', prefilled: !!existing };
+      render(); focusNoteText(); break;
+    }
+    case 'note-edit': noteEdit = { mode: 'edit', key: el.dataset.key, text: state.notes[el.dataset.key] || '', err: '' }; render(); focusNoteText(); break;
+    case 'note-cancel': noteEdit = null; render(); break;
+    case 'note-save': saveNoteEdit(); break;
+    case 'note-del': {
+      const k = noteEdit.key;
+      openSheet({ kind: 'confirm', title: 'Delete this note?', yes: 'Delete',
+        body: `The note for ${fmtLong(k)} will be removed.`,
+        onYes: () => { delete state.notes[k]; noteEdit = null; } });
+      break;
+    }
     case 'export': exportBackup(); break;
     case 'copy-backup': copyBackup(); break;
     case 'restore-open': openSheet({ kind: 'restore', text: '', parsed: null, err: '' }); break;
@@ -1465,6 +1559,18 @@ document.addEventListener('click', e => {
 
 document.addEventListener('input', e => {
   const f = e.target.dataset && e.target.dataset.field;
+  if (f === 'ne-text' && noteEdit) { noteEdit.text = e.target.value; noteEdit.prefilled = false; return; }
+  if (f === 'ne-date' && noteEdit) {
+    const v = e.target.value;
+    noteEdit.key = v; noteEdit.err = '';
+    const existing = isKey(v) ? state.notes[v] : undefined;
+    const ta = $('#ne-text');
+    if (existing && (!String(noteEdit.text || '').trim() || noteEdit.prefilled)) { noteEdit.text = existing; noteEdit.prefilled = true; if (ta) ta.value = existing; }
+    else if (!existing && noteEdit.prefilled) { noteEdit.text = ''; noteEdit.prefilled = false; if (ta) ta.value = ''; }
+    const hint = $('#ne-hint');
+    if (hint) hint.textContent = existing ? 'This date already has a note. Saving replaces it with the text above.' : '';
+    return;
+  }
   if (!f || !sheet) return;
   const v = e.target.value;
   if (sheet.kind === 'type') {
@@ -1526,7 +1632,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-window.addEventListener('hashchange', () => { closeSheet(); render(); window.scrollTo({ top: 0 }); });
+window.addEventListener('hashchange', () => { closeSheet(); noteEdit = null; render(); window.scrollTo({ top: 0 }); });
 
 init();
 
