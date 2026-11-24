@@ -248,6 +248,29 @@ main { padding: 14px calc(16px + env(safe-area-inset-right)) 24px calc(16px + en
   padding: 12px; border: 1px solid var(--accent); border-radius: 10px; background: var(--bg);
 }
 .noteedit .input { background-color: var(--surface); }
+.leaves { display: flex; flex-direction: column; }
+.leaveblk {
+  display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left;
+  padding: 12px 2px; border: 0; border-top: 1px solid var(--line); background: none;
+}
+.leaveblk:first-child { border-top: 0; }
+.lbhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.lbhead .len {
+  font-size: 12.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.lbcmp { display: flex; flex-direction: column; gap: 6px; padding: 9px 10px; border-radius: 8px; background: var(--bg); }
+.lbname { font-size: 13px; font-weight: 600; }
+.lstrip { display: flex; flex-wrap: wrap; gap: 3px; }
+.sq { width: 14px; height: 14px; border-radius: 3px; display: inline-block; flex: none; }
+.sq.both { background: var(--good); }
+.sq.off { background: var(--good-tint); box-shadow: inset 0 0 0 1.5px var(--good); }
+.sq.work { background: var(--line); }
+.sq.none { box-shadow: inset 0 0 0 1px var(--muted); opacity: 0.5; }
+.lbtext { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.lbtext .k { font-weight: 600; }
+.lbtext .k.both { color: var(--good); }
+.lbtext .muted { font-size: 12.5px; }
 textarea.input { resize: vertical; min-height: 84px; line-height: 1.4; }
 .row.static { cursor: default; }
 .ccell.both { background: var(--good-tint); border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
@@ -486,7 +509,7 @@ const LS_DATA = 'shift-roster-data-v1';
 const LS_UI = 'shift-roster-ui-v1';
 const VIEWS = ['calendar', 'compare', 'setup'];
 const MAX_SLOTS = 120;
-const APP_VERSION = '7 (standalone)';
+const APP_VERSION = '8 (standalone)';
 const THEMES = [['auto', 'Match phone'], ['light', 'Light'], ['dark', 'Dark']];
 const MAX_RANGE = 366;
 const ICON_PREV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
@@ -704,10 +727,11 @@ function loadUI() {
     if (THEMES.some(([v]) => v === u.theme)) ui.theme = u.theme;
     if (isKey(u.lastBackup)) ui.lastBackup = u.lastBackup;
     if (typeof u.notesCollapsed === 'boolean') ui.notesCollapsed = u.notesCollapsed;
+    if (typeof u.leaveCollapsed === 'boolean') ui.leaveCollapsed = u.leaveCollapsed;
   } catch (_) { /* storage unavailable */ }
 }
 function saveUI() {
-  try { localStorage.setItem(LS_UI, JSON.stringify({ person: ui.person, a: ui.a, b: ui.b, patPerson: ui.patPerson, theme: ui.theme, lastBackup: ui.lastBackup || null, notesCollapsed: !!ui.notesCollapsed })); } catch (_) { /* ignore */ }
+  try { localStorage.setItem(LS_UI, JSON.stringify({ person: ui.person, a: ui.a, b: ui.b, patPerson: ui.patPerson, theme: ui.theme, lastBackup: ui.lastBackup || null, notesCollapsed: !!ui.notesCollapsed, leaveCollapsed: !!ui.leaveCollapsed })); } catch (_) { /* ignore */ }
 }
 function applyTheme() {
   const root = document.documentElement;
@@ -898,6 +922,7 @@ function viewCalendar() {
       <button type="button" class="btn sm primary" data-action="add-pattern" data-pid="${esc(pid)}" ${state.types.length ? '' : 'disabled'}>Build pattern</button></div>`);
   }
   parts.push(notesPanel());
+  parts.push(leavePanel(pid));
   const legend = [];
   for (const t of state.types) {
     const n = counts.get(t.id);
@@ -945,6 +970,99 @@ function notesPanel() {
   return `<section class="card tight">${head}
     <div id="notes-body" class="notes">${adding ? noteForm(noteEdit) : ''}${rows || (adding ? '' : '<p class="muted" style="margin:0">No upcoming notes.</p>')}</div>
     <p class="hint">Tap a note to edit it. Notes leave this list once their day has passed and stay on the calendar day.</p>
+  </section>`;
+}
+// Upcoming leave: blocks of consecutive days on the shift type named "Annual Leave" for the selected person,
+// each compared with every other person: days both on leave, and days the other person is otherwise off.
+const LEAVE_NAME = 'annual leave';
+function leaveTypeIds() {
+  return new Set(state.types.filter(t => t.name.trim().toLowerCase() === LEAVE_NAME).map(t => t.id));
+}
+function leaveBlocks(pid, ids) {
+  if (!ids.size) return [];
+  const isAL = n => ids.has(resolve(pid, numToKey(n)).val);
+  const today = keyToNum(todayKey());
+  let end = today + 730;
+  for (const k of Object.keys(state.overrides[pid] || {})) {
+    if (ids.has(state.overrides[pid][k])) end = Math.max(end, keyToNum(k));
+  }
+  let start = today;
+  for (let i = 0; i < 366 && isAL(start - 1); i++) start--;
+  const blocks = [];
+  let cur = null;
+  for (let n = start; n <= end; n++) {
+    if (isAL(n)) {
+      if (cur && cur.end === n - 1) cur.end = n;
+      else { cur = { start: n, end: n }; blocks.push(cur); }
+    }
+  }
+  return blocks.filter(b => b.end >= today);
+}
+function dayRuns(nums) {
+  const runs = [];
+  for (const n of nums) {
+    const last = runs[runs.length - 1];
+    if (last && last.end === n - 1) last.end = n; else runs.push({ start: n, end: n });
+  }
+  return runs.map(r => r.start === r.end ? fmtShort(numToKey(r.start)) : `${fmtShort(numToKey(r.start))} to ${fmtShort(numToKey(r.end))}`).join(', ');
+}
+function leaveCompare(block, other, ids) {
+  const out = { both: [], off: [], work: [], none: [], cells: [] };
+  for (let n = block.start; n <= block.end; n++) {
+    const v = resolve(other, numToKey(n)).val;
+    const kind = ids.has(v) ? 'both' : isOff(v) ? 'off' : v == null ? 'none' : 'work';
+    out[kind].push(n);
+    out.cells.push(kind);
+  }
+  return out;
+}
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+function leavePanel(pid) {
+  const person = personById(pid);
+  const ids = leaveTypeIds();
+  const blocks = leaveBlocks(pid, ids);
+  const open = !ui.leaveCollapsed;
+  const head = `<div class="sechead">
+      <button type="button" class="panelhead" data-action="leave-toggle" aria-expanded="${open}" aria-controls="leave-body">
+        <span class="h sm">Upcoming leave</span><span class="count">${blocks.length}</span>
+        <span class="fold${open ? ' open' : ''}" aria-hidden="true">${ICON_DOWN}</span>
+      </button>
+    </div>`;
+  if (!open) return `<section class="card tight">${head}</section>`;
+  if (!ids.size) {
+    return `<section class="card tight">${head}<p class="muted" style="margin:0">Add a shift type named Annual Leave in Setup and its days show up here.</p></section>`;
+  }
+  const others = state.people.filter(p => p.id !== pid);
+  const today = keyToNum(todayKey());
+  const thisYear = new Date().getFullYear();
+  const dayLabel = n => { const k = numToKey(n); return +k.slice(0, 4) === thisYear ? fmtShort(k) : fmtLong(k); };
+  const rows = blocks.map(b => {
+    const len = b.end - b.start + 1;
+    const range = len === 1 ? dayLabel(b.start) : `${dayLabel(b.start)} to ${dayLabel(b.end)}`;
+    const cmp = others.map(o => {
+      const c = leaveCompare(b, o.id, ids);
+      const name = esc(o.name);
+      const summary = `${o.name}: ${plural(c.both.length, 'day')} both on leave, ${plural(c.off.length, 'day')} off, ${plural(c.work.length, 'day')} working${c.none.length ? ', ' + plural(c.none.length, 'day') + ' with no roster' : ''}.`;
+      const lines = [];
+      if (c.both.length) lines.push(`<span><span class="k both">Both on leave · ${plural(c.both.length, 'day')}</span> ${dayRuns(c.both)}</span>`);
+      if (c.off.length) lines.push(`<span><span class="k">${name} off · ${plural(c.off.length, 'day')}</span> ${dayRuns(c.off)}</span>`);
+      const rest = [];
+      if (c.work.length) rest.push(`working ${plural(c.work.length, 'day')}`);
+      if (c.none.length) rest.push(`no roster ${plural(c.none.length, 'day')}`);
+      if (rest.length) lines.push(`<span class="muted">${name} ${rest.join(', ')}</span>`);
+      return `<span class="lbcmp"><span class="lbname">${name}</span>
+        <span class="lstrip" role="img" aria-label="${esc(summary)}">${c.cells.map(k => `<span class="sq ${k}"></span>`).join('')}</span>
+        <span class="lbtext">${lines.join('')}</span></span>`;
+    }).join('');
+    return `<button type="button" class="leaveblk" data-action="jump" data-key="${numToKey(b.start)}">
+      <span class="lbhead"><strong>${range}</strong><span class="len">${plural(len, 'day')}</span>${b.start < today ? '<span class="tag">Underway</span>' : ''}</span>
+      ${cmp}</button>`;
+  }).join('');
+  const legend = others.length ? `<ul class="legend"><li><span class="sq both"></span>Both on leave</li><li><span class="sq off"></span>Off</li><li><span class="sq work"></span>Working</li></ul>` : '';
+  return `<section class="card tight">${head}
+    <div id="leave-body" class="leaves">${rows || `<p class="muted" style="margin:0">No upcoming annual leave for ${esc(person.name)}.</p>`}</div>
+    ${rows ? legend : ''}
+    <p class="hint">${esc(person.name)}'s leave, picked at the top of the calendar.${others.length ? ' Each block shows how the other rosters line up.' : ' Add another person to compare.'} Tap a block to jump to it.</p>
   </section>`;
 }
 function focusNoteText() {
@@ -1501,6 +1619,7 @@ document.addEventListener('click', e => {
     case 'edit-type': openType(el.dataset.id); break;
     case 'add-pattern': openPattern(el.dataset.pid || activePerson(), null); break;
     case 'edit-pattern': openPattern(el.dataset.pid, el.dataset.sid); break;
+    case 'leave-toggle': ui.leaveCollapsed = !ui.leaveCollapsed; saveUI(); render(); break;
     case 'notes-toggle': ui.notesCollapsed = !ui.notesCollapsed; if (ui.notesCollapsed) noteEdit = null; saveUI(); render(); break;
     case 'note-add': {
       const k = todayKey();
