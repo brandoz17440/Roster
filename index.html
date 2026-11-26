@@ -2,7 +2,7 @@
 <html lang="en-AU">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Roster">
@@ -107,8 +107,8 @@
 }
 
 * { box-sizing: border-box; }
-/* No double-tap zoom: "manipulation" keeps scrolling and pinch-zoom but drops the double-tap gesture */
-html, body, * { touch-action: manipulation; }
+/* No zooming at all: "pan-x pan-y" allows scrolling only, so pinch and double-tap zoom are both off */
+html, body, * { touch-action: pan-x pan-y; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { height: 100%; margin: 0; }
 body {
@@ -513,7 +513,7 @@ const LS_DATA = 'shift-roster-data-v1';
 const LS_UI = 'shift-roster-ui-v1';
 const VIEWS = ['calendar', 'compare', 'setup'];
 const MAX_SLOTS = 120;
-const APP_VERSION = '9 (standalone)';
+const APP_VERSION = '10 (standalone)';
 const THEMES = [['auto', 'Match phone'], ['light', 'Light'], ['dark', 'Dark']];
 const MAX_RANGE = 366;
 const ICON_PREV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
@@ -1758,6 +1758,12 @@ document.addEventListener('keydown', e => {
 window.addEventListener('hashchange', () => { closeSheet(); noteEdit = null; render(); window.scrollTo({ top: 0 }); });
 
 init();
+
+// Block pinch-zoom in iOS Safari, which can ignore the viewport setting
+['gesturestart', 'gesturechange', 'gestureend'].forEach(type => {
+  document.addEventListener(type, e => e.preventDefault(), { passive: false });
+});
+document.addEventListener('touchmove', e => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
