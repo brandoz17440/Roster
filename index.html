@@ -107,6 +107,9 @@
 }
 
 * { box-sizing: border-box; }
+/* No double-tap zoom: "manipulation" keeps scrolling and pinch-zoom but drops the double-tap gesture */
+html, body, * { touch-action: manipulation; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg);
@@ -362,6 +365,7 @@ textarea.input { resize: vertical; min-height: 84px; line-height: 1.4; }
   background-color: var(--bg); min-height: 44px;
   /* Set text colour explicitly: some mobile webviews ignore inherited colour in form fields, mainly textareas in dark mode */
   color: var(--ink); -webkit-text-fill-color: var(--ink); caret-color: var(--accent);
+  font-size: 16px; /* 16px or larger stops iOS zooming in when a box is tapped */
 }
 textarea.input, select.input, input.input:not([type]), input.input[type="number"] { -webkit-appearance: none; appearance: none; }
 .input::placeholder { color: var(--muted); -webkit-text-fill-color: var(--muted); opacity: 1; }
@@ -509,7 +513,7 @@ const LS_DATA = 'shift-roster-data-v1';
 const LS_UI = 'shift-roster-ui-v1';
 const VIEWS = ['calendar', 'compare', 'setup'];
 const MAX_SLOTS = 120;
-const APP_VERSION = '8 (standalone)';
+const APP_VERSION = '9 (standalone)';
 const THEMES = [['auto', 'Match phone'], ['light', 'Light'], ['dark', 'Dark']];
 const MAX_RANGE = 366;
 const ICON_PREV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
